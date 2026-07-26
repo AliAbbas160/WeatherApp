@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="20dp">
+
+    <TextView
+        android:id="@+id/tvDay"
+        android:layout_width="70dp"
+        android:layout_height="wrap_content"
+        android:text="Monday"
+        android:textSize="16sp"
+        android:textStyle="bold"/>
+
+    <ImageView
+        android:id="@+id/imgDailyWeather"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="16dp"
+        android:src="@drawable/ic_sunny"/>
+
+    <TextView
+        android:id="@+id/tvCondition"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:text="Sunny"
+        android:textSize="15sp"/>
+
+    <TextView
+        android:id="@+id/tvHighLow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="35° / 27°"
+        android:textStyle="bold"/>
+</LinearLayout>

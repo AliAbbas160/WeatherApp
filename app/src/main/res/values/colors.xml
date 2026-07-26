@@ -1,5 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+
+    <!-- Sky -->
+    <color name="skyBlue">#4FACFE</color>
+    <color name="lightBlue">#6FB8FF</color>
+    <color name="iceBlue">#EAF6FF</color>
+
+    <!-- Night -->
+    <color name="nightBlue">#1C2A48</color>
+    <color name="deepPurple">#3A3F8F</color>
+
+    <!-- Rain -->
+    <color name="rainBlue">#4A6FA5</color>
+    <color name="darkRain">#263238</color>
+
+    <!-- Cards -->
+    <color name="glassWhite">#55FFFFFF</color>
+    <color name="glassStroke">#55FFFFFF</color>
+
+    <!-- Text -->
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="textSecondary">#CCFFFFFF</color>
+
+    <!-- Accent -->
+    <color name="sunYellow">#FFD54F</color>
+
 </resources>
