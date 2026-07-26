@@ -24,12 +24,17 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.aligazge.weatherapp.adapter.DailyWeatherAdapter
 import com.aligazge.weatherapp.model.DailyWeather
 import java.text.SimpleDateFormat
+import android.widget.Toast
+import android.view.View
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private var lastCity = "Sharjah"
+    private var isUsingLocation = false
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -50,6 +55,15 @@ class MainActivity : AppCompatActivity() {
 
         setupHourlyForecast()
         setupSearch()
+
+        binding.swipeRefresh.setOnRefreshListener {
+
+            if (isUsingLocation) {
+                getCurrentLocation()
+            } else {
+                fetchWeather(lastCity)
+            }
+        }
 
         binding.btnLocation.setOnClickListener {
             checkLocationPermission()
@@ -96,6 +110,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun fetchWeather(city: String, clearSearch: Boolean = false) {
 
+        lastCity = city
+        isUsingLocation = false
+
+        binding.loadingOverlay.visibility = View.VISIBLE
         lifecycleScope.launch {
 
             try {
@@ -114,6 +132,16 @@ class MainActivity : AppCompatActivity() {
                         binding.tvCity.text = weather.name
                         binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
                         binding.tvCondition.text = weather.weather[0].main
+                        binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
+                        binding.tvHumidity.text = "${weather.main.humidity}%"
+                        val windSpeedKmh = weather.wind.speed * 3.6
+                        binding.tvWindSpeed.text = "${windSpeedKmh.toInt()} km/h"
+                        binding.tvPressure.text = "${weather.main.pressure} hPa"
+                        binding.tvVisibility.text = "${weather.visibility / 1000} km"
+                        binding.tvCloudiness.text = "${weather.clouds.all}%"
+
+
+
                         updateWeatherTheme(
                             weather.weather[0].main,
                             weather.weather[0].icon
@@ -127,8 +155,13 @@ class MainActivity : AppCompatActivity() {
                             binding.etSearch.text?.clear()
                         }
                     }
+                    binding.loadingOverlay.visibility = View.GONE
+                    binding.swipeRefresh.isRefreshing = false
 
                 } else {
+
+                    binding.loadingOverlay.visibility = View.GONE
+                    binding.swipeRefresh.isRefreshing = false
 
                     Log.e(
                         "WeatherAPI",
@@ -139,7 +172,14 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: Exception) {
 
-                Log.e("WeatherAPI", "Exception: ${e.message}", e)
+                binding.loadingOverlay.visibility = View.GONE
+                binding.swipeRefresh.isRefreshing = false
+
+                Toast.makeText(
+                    this@MainActivity,
+                    "Failed to load weather",
+                    Toast.LENGTH_SHORT
+                ).show()
 
             }
         }
@@ -150,6 +190,9 @@ class MainActivity : AppCompatActivity() {
         longitude: Double
     ) {
 
+        isUsingLocation = true
+
+        binding.loadingOverlay.visibility = View.VISIBLE
         lifecycleScope.launch {
 
             try {
@@ -169,6 +212,16 @@ class MainActivity : AppCompatActivity() {
                         binding.tvCity.text = weather.name
                         binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
                         binding.tvCondition.text = weather.weather[0].main
+                        binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
+                        binding.tvHumidity.text = "${weather.main.humidity}%"
+                        val windSpeedKmh = weather.wind.speed * 3.6
+                        binding.tvWindSpeed.text = "${windSpeedKmh.toInt()} km/h"
+                        binding.tvPressure.text = "${weather.main.pressure} hPa"
+                        binding.tvVisibility.text = "${weather.visibility / 1000} km"
+                        binding.tvCloudiness.text = "${weather.clouds.all}%"
+
+
+
                         updateWeatherTheme(
                             weather.weather[0].main,
                             weather.weather[0].icon
@@ -178,19 +231,30 @@ class MainActivity : AppCompatActivity() {
 
                         fetchForecast(weather.name)
                     }
+                    binding.loadingOverlay.visibility = View.GONE
+                    binding.swipeRefresh.isRefreshing = false
 
                 } else {
+
+                    binding.loadingOverlay.visibility = View.GONE
+                    binding.swipeRefresh.isRefreshing = false
 
                     Log.e(
                         "WeatherAPI",
                         "Error: ${response.code()} ${response.message()}"
                     )
-
                 }
 
             } catch (e: Exception) {
 
-                Log.e("WeatherAPI", "Exception: ${e.message}", e)
+                binding.loadingOverlay.visibility = View.GONE
+                binding.swipeRefresh.isRefreshing = false
+
+                Toast.makeText(
+                    this@MainActivity,
+                    "Failed to load weather",
+                    Toast.LENGTH_SHORT
+                ).show()
 
             }
         }
