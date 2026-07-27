@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.aligazge.weatherapp.api.RetrofitClient
 import com.aligazge.weatherapp.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -28,6 +27,10 @@ import android.widget.Toast
 import android.view.View
 import android.content.SharedPreferences
 import java.util.Date
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import com.aligazge.weatherapp.api.WeatherApiClient
+import com.aligazge.weatherapp.util.Constants
 
 
 class MainActivity : AppCompatActivity() {
@@ -84,20 +87,33 @@ class MainActivity : AppCompatActivity() {
         } else {
             fetchWeather(lastCity ?: "Sharjah")
         }
+
     }
 
     private fun setupSearch() {
 
-        binding.etSearch.setOnEditorActionListener { _, _, _ ->
+        binding.etSearch.setOnEditorActionListener { _, actionId, _ ->
 
-            val city = binding.etSearch.text.toString().trim()
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
 
-            if (city.isNotEmpty()) {
-                fetchWeather(city, clearSearch = true)
+                val city = binding.etSearch.text.toString().trim()
+
+                if (city.isNotEmpty()) {
+                    hideKeyboard()
+                    fetchWeather(city, clearSearch = true)
+                }
+
+                true
+            } else {
+                false
             }
-
-            true
         }
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(binding.etSearch.windowToken, 0)
+        binding.etSearch.clearFocus()
     }
 
     private fun formatTime(timestamp: Long, timezoneOffset: Int): String {
@@ -105,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
         return sdf.format(Date((timestamp + timezoneOffset) * 1000L))
     }
+
 
     private fun checkLocationPermission() {
 
@@ -127,87 +144,85 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun fetchWeather(city: String, clearSearch: Boolean = false) {
+    private fun fetchWeather(location: String,clearSearch: Boolean = false,isLocation: Boolean = false
+    ){
 
-        lastCity = city
-        isUsingLocation = false
+        if (!isLocation) {
+            lastCity = location
+        }
+
+        isUsingLocation = isLocation
 
         binding.loadingOverlay.visibility = View.VISIBLE
         lifecycleScope.launch {
 
             try {
 
-                val response = RetrofitClient.api.getCurrentWeather(
-                    city = city,
-                    apiKey = BuildConfig.WEATHER_API_KEY
+                val response = WeatherApiClient.api.getCurrentWeather(
+                    apiKey = Constants.WEATHER_API_KEY,
+                    location = location
                 )
 
                 if (response.isSuccessful) {
 
                     val weather = response.body()
 
-                    Log.d("WeatherDebug", "Condition = ${weather?.weather?.get(0)?.main}")
-                    Log.d("WeatherDebug", "Description = ${weather?.weather?.get(0)?.description}")
-                    Log.d("WeatherDebug", "Icon = ${weather?.weather?.get(0)?.icon}")
-
                     if (weather != null) {
 
-                        binding.tvCity.text = weather.name
+                        binding.tvCity.text = weather.location.name
 
                         sharedPreferences.edit()
-                            .putString("last_city", weather.name)
-                            .putBoolean("use_location", false)
+                            .putString("last_city", weather.location.name)
+                            .putBoolean("use_location", isLocation)
                             .apply()
 
-                        binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
-                        binding.tvCondition.text =
-                            weather.weather[0].description.replaceFirstChar {
-                                it.titlecase(Locale.getDefault())
-                            }
-                        binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
-                        binding.tvHumidity.text = "${weather.main.humidity}%"
-                        val windSpeedKmh = weather.wind.speed * 3.6
-                        binding.tvWindSpeed.text = "${windSpeedKmh.toInt()} km/h"
-                        binding.tvPressure.text = "${weather.main.pressure} hPa"
-                        binding.tvVisibility.text = "${weather.visibility / 1000} km"
-                        binding.tvCloudiness.text = "${weather.clouds.all}%"
-                        binding.tvSunrise.text = formatTime(weather.sys.sunrise, weather.timezone)
-                        binding.tvSunset.text = formatTime(weather.sys.sunset, weather.timezone)
+                        binding.tvTemperature.text = "${weather.current.tempC.toInt()}°"
 
+                        binding.tvCondition.text = weather.current.condition.text
 
+                        binding.tvFeelsLike.text =
+                            "${weather.current.feelsLikeC.toInt()}°C"
+
+                        binding.tvHumidity.text =
+                            "${weather.current.humidity}%"
+
+                        binding.tvWindSpeed.text =
+                            "${weather.current.windKph.toInt()} km/h"
+
+                        binding.tvPressure.text =
+                            "${weather.current.pressureMb.toInt()} hPa"
+
+                        binding.tvVisibility.text =
+                            "${weather.current.visibilityKm.toInt()} km"
+
+                        binding.tvCloudiness.text =
+                            "${weather.current.cloud}%"
+
+                        binding.tvAirQuality.text =
+                            weather.current.airQuality.usEpaIndex.toString()
 
                         updateWeatherTheme(
-                            weather.weather[0].main,
-                            weather.weather[0].icon
+                            weather.current.condition.text,
+                            weather.current.isDay == 1
                         )
-                        binding.tvHighLow.text =
-                            "H:${weather.main.temp_max.toInt()}°   L:${weather.main.temp_min.toInt()}°"
 
-                        fetchForecast(weather.name)
+                        fetchForecast(weather.location.name)
 
                         if (clearSearch) {
                             binding.etSearch.text?.clear()
                         }
+
                     }
-                    binding.loadingOverlay.visibility = View.GONE
-                    binding.swipeRefresh.isRefreshing = false
 
                 } else {
 
-                    binding.loadingOverlay.visibility = View.GONE
-                    binding.swipeRefresh.isRefreshing = false
-
-                    Log.e(
-                        "WeatherAPI",
-                        "Error: ${response.code()} ${response.message()}"
-                    )
+                    Log.e("WeatherAPI", response.errorBody()?.string() ?: "Unknown Error")
 
                 }
 
             } catch (e: Exception) {
 
-                binding.loadingOverlay.visibility = View.GONE
-                binding.swipeRefresh.isRefreshing = false
+                Log.e("WeatherAPI", e.message ?: "Exception", e)
 
                 Toast.makeText(
                     this@MainActivity,
@@ -215,7 +230,13 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
 
+            } finally {
+
+                binding.loadingOverlay.visibility = View.GONE
+                binding.swipeRefresh.isRefreshing = false
+
             }
+
         }
     }
 
@@ -224,107 +245,56 @@ class MainActivity : AppCompatActivity() {
         longitude: Double
     ) {
 
-        isUsingLocation = true
+        fetchWeather(
+            location = "$latitude,$longitude",
+            isLocation = true
+        )
 
-        binding.loadingOverlay.visibility = View.VISIBLE
-        lifecycleScope.launch {
-
-            try {
-
-                val response = RetrofitClient.api.getCurrentWeatherByLocation(
-                    latitude = latitude,
-                    longitude = longitude,
-                    apiKey = BuildConfig.WEATHER_API_KEY
-                )
-
-                if (response.isSuccessful) {
-
-                    val weather = response.body()
-
-                    Log.d("WeatherDebug", "Condition = ${weather?.weather?.get(0)?.main}")
-                    Log.d("WeatherDebug", "Description = ${weather?.weather?.get(0)?.description}")
-                    Log.d("WeatherDebug", "Icon = ${weather?.weather?.get(0)?.icon}")
-
-                    if (weather != null) {
-
-                        binding.tvCity.text = weather.name
-
-                        sharedPreferences.edit()
-                            .putString("last_city", weather.name)
-                            .putBoolean("use_location", true)
-                            .apply()
-
-                        binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
-                        binding.tvCondition.text =
-                            weather.weather[0].description.replaceFirstChar {
-                                it.titlecase(Locale.getDefault())
-                            }
-                        binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
-                        binding.tvHumidity.text = "${weather.main.humidity}%"
-                        val windSpeedKmh = weather.wind.speed * 3.6
-                        binding.tvWindSpeed.text = "${windSpeedKmh.toInt()} km/h"
-                        binding.tvPressure.text = "${weather.main.pressure} hPa"
-                        binding.tvVisibility.text = "${weather.visibility / 1000} km"
-                        binding.tvCloudiness.text = "${weather.clouds.all}%"
-                        binding.tvSunrise.text = formatTime(weather.sys.sunrise, weather.timezone)
-                        binding.tvSunset.text = formatTime(weather.sys.sunset, weather.timezone)
-
-
-
-                        updateWeatherTheme(
-                            weather.weather[0].main,
-                            weather.weather[0].icon
-                        )
-                        binding.tvHighLow.text =
-                            "H:${weather.main.temp_max.toInt()}°   L:${weather.main.temp_min.toInt()}°"
-
-                        fetchForecast(weather.name)
-                    }
-                    binding.loadingOverlay.visibility = View.GONE
-                    binding.swipeRefresh.isRefreshing = false
-
-                } else {
-
-                    binding.loadingOverlay.visibility = View.GONE
-                    binding.swipeRefresh.isRefreshing = false
-
-                    Log.e(
-                        "WeatherAPI",
-                        "Error: ${response.code()} ${response.message()}"
-                    )
-                }
-
-            } catch (e: Exception) {
-
-                binding.loadingOverlay.visibility = View.GONE
-                binding.swipeRefresh.isRefreshing = false
-
-                Toast.makeText(
-                    this@MainActivity,
-                    "Failed to load weather",
-                    Toast.LENGTH_SHORT
-                ).show()
-
-            }
-        }
     }
 
     private fun getWeatherIcon(condition: String): Int {
-        return when (condition) {
-            "Clear" -> R.drawable.ic_sunny
-            "Clouds" -> R.drawable.ic_cloud
-            "Rain" -> R.drawable.ic_rain
-            else -> R.drawable.ic_cloud
+
+        val weather = condition.lowercase(Locale.getDefault())
+
+        return when {
+
+            weather.contains("sun") || weather.contains("clear") ->
+                R.drawable.ic_sunny
+
+            weather.contains("cloud") || weather.contains("overcast") ->
+                R.drawable.ic_cloud
+
+            weather.contains("rain") || weather.contains("drizzle") ->
+                R.drawable.ic_rain
+
+            weather.contains("snow")
+                    || weather.contains("blizzard")
+                    || weather.contains("ice")
+                    || weather.contains("sleet") ->
+                R.drawable.ic_cloud
+
+            weather.contains("thunder") ->
+                R.drawable.ic_rain
+
+            weather.contains("mist")
+                    || weather.contains("fog")
+                    || weather.contains("haze") ->
+                R.drawable.ic_cloud
+
+            else ->
+                R.drawable.ic_cloud
         }
     }
 
-    private fun updateWeatherTheme(condition: String,icon: String ) {
+    private fun updateWeatherTheme(condition: String,isDay: Boolean) {
 
-        when (condition) {
+        val weather = condition.lowercase(Locale.getDefault())
 
-            "Clear" -> {
+        when {
 
-                if (icon.endsWith("n")) {
+            weather.contains("sun") || weather.contains("clear") -> {
+
+                if (!isDay) {
                     binding.main.setBackgroundResource(R.drawable.background_night)
                     binding.weatherAnimation.setAnimation(R.raw.night)
                 } else {
@@ -333,9 +303,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            "Clouds" -> {
+            weather.contains("cloud") || weather.contains("overcast") -> {
 
-                if (icon.endsWith("n")) {
+                if (!isDay) {
                     binding.main.setBackgroundResource(R.drawable.background_night)
                 } else {
                     binding.main.setBackgroundResource(R.drawable.background_cloudy)
@@ -344,9 +314,9 @@ class MainActivity : AppCompatActivity() {
                 binding.weatherAnimation.setAnimation(R.raw.cloud)
             }
 
-            "Rain", "Drizzle" -> {
+            weather.contains("rain") || weather.contains("drizzle") -> {
 
-                if (icon.endsWith("n")) {
+                if (!isDay) {
                     binding.main.setBackgroundResource(R.drawable.background_night)
                 } else {
                     binding.main.setBackgroundResource(R.drawable.background_rainy)
@@ -355,9 +325,9 @@ class MainActivity : AppCompatActivity() {
                 binding.weatherAnimation.setAnimation(R.raw.rain)
             }
 
-            "Thunderstorm" -> {
+            weather.contains("thunder") -> {
 
-                if (icon.endsWith("n")) {
+                if (!isDay){
                     binding.main.setBackgroundResource(R.drawable.background_night)
                 } else {
                     binding.main.setBackgroundResource(R.drawable.background_storm)
@@ -366,9 +336,12 @@ class MainActivity : AppCompatActivity() {
                 binding.weatherAnimation.setAnimation(R.raw.storm)
             }
 
-            "Snow" -> {
+            weather.contains("snow")
+                    || weather.contains("blizzard")
+                    || weather.contains("sleet")
+                    || weather.contains("ice") -> {
 
-                if (icon.endsWith("n")) {
+                if (!isDay){
                     binding.main.setBackgroundResource(R.drawable.background_night)
                 } else {
                     binding.main.setBackgroundResource(R.drawable.background_snow)
@@ -377,9 +350,14 @@ class MainActivity : AppCompatActivity() {
                 binding.weatherAnimation.setAnimation(R.raw.snow)
             }
 
-            "Mist", "Fog", "Haze", "Smoke" -> {
+            weather.contains("mist")
+                    || weather.contains("fog")
+                    || weather.contains("haze")
+                    || weather.contains("smoke")
+                    || weather.contains("dust")
+                    || weather.contains("sand") -> {
 
-                if (icon.endsWith("n")) {
+                if (!isDay) {
                     binding.main.setBackgroundResource(R.drawable.background_night)
                 } else {
                     binding.main.setBackgroundResource(R.drawable.background_cloudy)
@@ -389,8 +367,14 @@ class MainActivity : AppCompatActivity() {
             }
 
             else -> {
-                binding.main.setBackgroundResource(R.drawable.background_sunny)
-                binding.weatherAnimation.setAnimation(R.raw.sunny)
+
+                if (!isDay){
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                    binding.weatherAnimation.setAnimation(R.raw.night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_sunny)
+                    binding.weatherAnimation.setAnimation(R.raw.sunny)
+                }
             }
         }
 
@@ -404,9 +388,9 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
-                val response = RetrofitClient.api.getForecast(
-                    city = city,
-                    apiKey = BuildConfig.WEATHER_API_KEY
+                val response = WeatherApiClient.api.getForecast(
+                    apiKey = Constants.WEATHER_API_KEY,
+                    location = city
                 )
 
                 if (response.isSuccessful) {
@@ -415,52 +399,22 @@ class MainActivity : AppCompatActivity() {
 
                     forecast?.let {
 
-                        val inputFormat = SimpleDateFormat(
-                            "yyyy-MM-dd HH:mm:ss",
-                            Locale.getDefault()
-                        )
+                        val today = it.forecast.forecastday.first()
 
-                        val outputFormat = SimpleDateFormat(
-                            "h a",
-                            Locale.getDefault()
-                        )
+                        val hourlyList = today.hour
+                            .take(5)
+                            .map { hour ->
 
-                        // Hourly Forecast
-                        val hourlyList = it.list.take(5).map { item ->
+                                val time = hour.time.substringAfter(" ")
 
-                            val date = inputFormat.parse(item.dt_txt)
-                            val time = outputFormat.format(date!!)
-
-                            HourlyWeather(
-                                time = time,
-                                temperature = "${item.main.temp.toInt()}°",
-                                icon = getWeatherIcon(item.weather[0].main)
-                            )
-                        }
-
-                        binding.rvHourlyWeather.adapter =
-                            HourlyWeatherAdapter(hourlyList)
-
-                        // Daily Forecast
-                        val dailyList = mutableListOf<DailyWeather>()
-
-                        val groupedForecast = it.list.groupBy {
-                            it.dt_txt.substring(0, 10)
-                        }
-
-                        groupedForecast.entries.take(5).forEach { entry ->
-
-                            val forecasts = entry.value
-
-                            val high = forecasts.maxOf { forecast ->
-                                forecast.main.temp
+                                HourlyWeather(
+                                    time = time,
+                                    temperature = "${hour.tempC.toInt()}°",
+                                    icon = getWeatherIcon(hour.condition.text)
+                                )
                             }
 
-                            val low = forecasts.minOf { forecast ->
-                                forecast.main.temp
-                            }
-
-                            val firstForecast = forecasts.first()
+                        val dailyList = it.forecast.forecastday.map { forecastDay ->
 
                             val day = SimpleDateFormat(
                                 "EEE",
@@ -469,17 +423,15 @@ class MainActivity : AppCompatActivity() {
                                 SimpleDateFormat(
                                     "yyyy-MM-dd",
                                     Locale.getDefault()
-                                ).parse(entry.key)!!
+                                ).parse(forecastDay.date)!!
                             )
 
-                            dailyList.add(
-                                DailyWeather(
-                                    day = day,
-                                    condition = firstForecast.weather[0].main,
-                                    highTemp = "${high.toInt()}°",
-                                    lowTemp = "${low.toInt()}°",
-                                    icon = getWeatherIcon(firstForecast.weather[0].main)
-                                )
+                            DailyWeather(
+                                day = day,
+                                condition = forecastDay.day.condition.text,
+                                highTemp = "${forecastDay.day.maxTemp.toInt()}°",
+                                lowTemp = "${forecastDay.day.minTemp.toInt()}°",
+                                icon = getWeatherIcon(forecastDay.day.condition.text)
                             )
                         }
 
@@ -488,7 +440,18 @@ class MainActivity : AppCompatActivity() {
 
                         binding.rvDailyWeather.adapter =
                             DailyWeatherAdapter(dailyList)
+
+                        binding.rvHourlyWeather.adapter =
+                            HourlyWeatherAdapter(hourlyList)
+
+                        binding.tvHighLow.text =
+                            "H:${today.day.maxTemp.toInt()}°   L:${today.day.minTemp.toInt()}°"
+
+                        binding.tvSunrise.text = today.astro.sunrise
+                        binding.tvSunset.text = today.astro.sunset
+
                     }
+
 
                 } else {
 
@@ -567,4 +530,7 @@ class MainActivity : AppCompatActivity() {
                 Log.e("Location", "Failed to get location", e)
             }
     }
+
+
+
 }

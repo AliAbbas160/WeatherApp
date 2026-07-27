@@ -25,4 +25,10 @@
     <!-- Accent -->
     <color name="sunYellow">#FFD54F</color>
 
+    <color name="aqi_good">#4CAF50</color>
+    <color name="aqi_fair">#8BC34A</color>
+    <color name="aqi_moderate">#FFC107</color>
+    <color name="aqi_poor">#FF9800</color>
+    <color name="aqi_very_poor">#F44336</color>
+
 </resources>
