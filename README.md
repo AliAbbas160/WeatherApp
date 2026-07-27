@@ -39,8 +39,10 @@ A modern Android weather application built with **Kotlin** that provides real-ti
 
 ## 📷 Screenshots
 
-
-
+<p align="center">
+  <img src="Assets/S1.jpeg" width="220"/>
+  <img src="Assets/S2.jpeg" width="220"/>
+</p>
 ---
 
 ---
