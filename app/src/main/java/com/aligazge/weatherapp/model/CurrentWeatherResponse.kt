@@ -6,7 +6,9 @@ data class CurrentWeatherResponse(
     val weather: List<Weather>,
     val wind: Wind,
     val visibility: Int,
-    val clouds: Clouds
+    val clouds: Clouds,
+    val sys: Sys,
+    val timezone: Int
 )
 
 data class Main(
@@ -30,4 +32,10 @@ data class Wind(
 
 data class Clouds(
     val all: Int
+)
+
+data class Sys(
+    val country: String,
+    val sunrise: Long,
+    val sunset: Long
 )

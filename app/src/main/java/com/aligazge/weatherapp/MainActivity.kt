@@ -26,12 +26,16 @@ import com.aligazge.weatherapp.model.DailyWeather
 import java.text.SimpleDateFormat
 import android.widget.Toast
 import android.view.View
+import android.content.SharedPreferences
+import java.util.Date
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private lateinit var sharedPreferences: SharedPreferences
 
     private var lastCity = "Sharjah"
     private var isUsingLocation = false
@@ -51,6 +55,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        sharedPreferences = getSharedPreferences("WeatherPrefs", MODE_PRIVATE)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         setupHourlyForecast()
@@ -69,8 +75,15 @@ class MainActivity : AppCompatActivity() {
             checkLocationPermission()
         }
 
-        // Load weather for the default city when the app starts
-        fetchWeather("Sharjah")
+        // Load last searched city
+        val useLocation = sharedPreferences.getBoolean("use_location", false)
+        val lastCity = sharedPreferences.getString("last_city", "Sharjah")
+
+        if (useLocation) {
+            checkLocationPermission()
+        } else {
+            fetchWeather(lastCity ?: "Sharjah")
+        }
     }
 
     private fun setupSearch() {
@@ -85,6 +98,12 @@ class MainActivity : AppCompatActivity() {
 
             true
         }
+    }
+
+    private fun formatTime(timestamp: Long, timezoneOffset: Int): String {
+        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        return sdf.format(Date((timestamp + timezoneOffset) * 1000L))
     }
 
     private fun checkLocationPermission() {
@@ -127,11 +146,24 @@ class MainActivity : AppCompatActivity() {
 
                     val weather = response.body()
 
+                    Log.d("WeatherDebug", "Condition = ${weather?.weather?.get(0)?.main}")
+                    Log.d("WeatherDebug", "Description = ${weather?.weather?.get(0)?.description}")
+                    Log.d("WeatherDebug", "Icon = ${weather?.weather?.get(0)?.icon}")
+
                     if (weather != null) {
 
                         binding.tvCity.text = weather.name
+
+                        sharedPreferences.edit()
+                            .putString("last_city", weather.name)
+                            .putBoolean("use_location", false)
+                            .apply()
+
                         binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
-                        binding.tvCondition.text = weather.weather[0].main
+                        binding.tvCondition.text =
+                            weather.weather[0].description.replaceFirstChar {
+                                it.titlecase(Locale.getDefault())
+                            }
                         binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
                         binding.tvHumidity.text = "${weather.main.humidity}%"
                         val windSpeedKmh = weather.wind.speed * 3.6
@@ -139,6 +171,8 @@ class MainActivity : AppCompatActivity() {
                         binding.tvPressure.text = "${weather.main.pressure} hPa"
                         binding.tvVisibility.text = "${weather.visibility / 1000} km"
                         binding.tvCloudiness.text = "${weather.clouds.all}%"
+                        binding.tvSunrise.text = formatTime(weather.sys.sunrise, weather.timezone)
+                        binding.tvSunset.text = formatTime(weather.sys.sunset, weather.timezone)
 
 
 
@@ -207,11 +241,24 @@ class MainActivity : AppCompatActivity() {
 
                     val weather = response.body()
 
+                    Log.d("WeatherDebug", "Condition = ${weather?.weather?.get(0)?.main}")
+                    Log.d("WeatherDebug", "Description = ${weather?.weather?.get(0)?.description}")
+                    Log.d("WeatherDebug", "Icon = ${weather?.weather?.get(0)?.icon}")
+
                     if (weather != null) {
 
                         binding.tvCity.text = weather.name
+
+                        sharedPreferences.edit()
+                            .putString("last_city", weather.name)
+                            .putBoolean("use_location", true)
+                            .apply()
+
                         binding.tvTemperature.text = "${weather.main.temp.toInt()}°"
-                        binding.tvCondition.text = weather.weather[0].main
+                        binding.tvCondition.text =
+                            weather.weather[0].description.replaceFirstChar {
+                                it.titlecase(Locale.getDefault())
+                            }
                         binding.tvFeelsLike.text = "${weather.main.feels_like.toInt()}°C"
                         binding.tvHumidity.text = "${weather.main.humidity}%"
                         val windSpeedKmh = weather.wind.speed * 3.6
@@ -219,6 +266,8 @@ class MainActivity : AppCompatActivity() {
                         binding.tvPressure.text = "${weather.main.pressure} hPa"
                         binding.tvVisibility.text = "${weather.visibility / 1000} km"
                         binding.tvCloudiness.text = "${weather.clouds.all}%"
+                        binding.tvSunrise.text = formatTime(weather.sys.sunrise, weather.timezone)
+                        binding.tvSunset.text = formatTime(weather.sys.sunset, weather.timezone)
 
 
 
@@ -285,27 +334,57 @@ class MainActivity : AppCompatActivity() {
             }
 
             "Clouds" -> {
-                binding.main.setBackgroundResource(R.drawable.background_cloudy)
+
+                if (icon.endsWith("n")) {
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_cloudy)
+                }
+
                 binding.weatherAnimation.setAnimation(R.raw.cloud)
             }
 
             "Rain", "Drizzle" -> {
-                binding.main.setBackgroundResource(R.drawable.background_rainy)
+
+                if (icon.endsWith("n")) {
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_rainy)
+                }
+
                 binding.weatherAnimation.setAnimation(R.raw.rain)
             }
 
             "Thunderstorm" -> {
-                binding.main.setBackgroundResource(R.drawable.background_storm)
+
+                if (icon.endsWith("n")) {
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_storm)
+                }
+
                 binding.weatherAnimation.setAnimation(R.raw.storm)
             }
 
             "Snow" -> {
-                binding.main.setBackgroundResource(R.drawable.background_snow)
+
+                if (icon.endsWith("n")) {
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_snow)
+                }
+
                 binding.weatherAnimation.setAnimation(R.raw.snow)
             }
 
             "Mist", "Fog", "Haze", "Smoke" -> {
-                binding.main.setBackgroundResource(R.drawable.background_cloudy)
+
+                if (icon.endsWith("n")) {
+                    binding.main.setBackgroundResource(R.drawable.background_night)
+                } else {
+                    binding.main.setBackgroundResource(R.drawable.background_cloudy)
+                }
+
                 binding.weatherAnimation.setAnimation(R.raw.cloud)
             }
 
